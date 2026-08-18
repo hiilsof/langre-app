@@ -17,7 +17,7 @@
   margin-top: 2px;
 }
 
-.furigana-switch {
+.furigana-group {
   margin-left: auto;
   display: flex;
   align-items: center;
@@ -25,10 +25,28 @@
   font-size: 0.82rem;
   color: var(--ink-soft);
 }
-.furigana-switch input {
-  accent-color: var(--accent);
-  width: 16px;
-  height: 16px;
+.pill-group {
+  display: flex;
+  gap: 2px;
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 2px;
+}
+.pill-group button {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.pill-group button.active {
+  background: var(--surface);
+  color: var(--accent-deep);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(27, 33, 41, 0.1);
 }
 
 .reader-page {
@@ -41,10 +59,6 @@
   font-family: var(--font-display);
   font-size: 1.45rem;
   line-height: 2.6;
-}
-
-.reader-page.no-furigana rt {
-  display: none;
 }
 
 rt {
@@ -115,4 +129,22 @@ rt {
   font-size: 0.82rem;
   color: var(--ink-faint);
   font-style: italic;
+}
+.wp-save {
+  margin-top: 12px;
+  width: 100%;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border: none;
+  border-radius: 999px;
+  padding: 7px 0;
+  cursor: pointer;
+}
+.wp-save:disabled {
+  color: var(--success);
+  background: var(--success-soft);
+  cursor: default;
 }

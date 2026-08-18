@@ -33,6 +33,10 @@ export async function listDocuments(): Promise<Document[]> {
   return (await getDB()).getAll("documents");
 }
 
+export async function getDocument(id: string): Promise<Document | undefined> {
+  return (await getDB()).get("documents", id);
+}
+
 export async function saveDocument(doc: Document): Promise<void> {
   await (await getDB()).put("documents", doc);
 }
@@ -45,8 +49,19 @@ export async function saveVocabEntry(entry: VocabEntry): Promise<void> {
   await (await getDB()).put("vocab", entry);
 }
 
-export async function getSettings(): Promise<Settings | undefined> {
-  return (await getDB()).get("settings", "settings");
+export const DEFAULT_SETTINGS: Settings = {
+  furigana: "all",
+  translation: "tap",
+  theme: "system",
+  voiceURI: null,
+  ttsSpeed: 1,
+};
+
+// Settings are stored sparsely (only the fields a screen has touched), so
+// callers always get a complete object back with defaults filled in.
+export async function getSettings(): Promise<Settings> {
+  const stored = await (await getDB()).get("settings", "settings");
+  return { ...DEFAULT_SETTINGS, ...stored };
 }
 
 export async function saveSettings(settings: Settings): Promise<void> {

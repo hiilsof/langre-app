@@ -9,6 +9,9 @@
   --accent-deep: #1f3f60;
   --accent-soft: #e4ebf2;
   --amber: #b8863a;
+  --amber-soft: #f3e7d2;
+  --success: #3f7d57;
+  --success-soft: #e1efe6;
   --font-display: "Zen Old Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", sans-serif;
 }
@@ -25,6 +28,9 @@
     --accent-deep: #a9c6e5;
     --accent-soft: #223247;
     --amber: #d9a968;
+    --amber-soft: #382c1b;
+    --success: #6fbe8b;
+    --success-soft: #1e332a;
   }
 }
 :root[data-theme="dark"] {
@@ -38,6 +44,9 @@
   --accent-deep: #a9c6e5;
   --accent-soft: #223247;
   --amber: #d9a968;
+  --amber-soft: #382c1b;
+  --success: #6fbe8b;
+  --success-soft: #1e332a;
 }
 
 * {

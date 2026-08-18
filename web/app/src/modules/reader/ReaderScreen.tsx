@@ -1,18 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { tokenize } from "../../lib/tokenizer";
 import { lookup } from "../../lib/dictionary";
-import type { Token } from "../../types";
+import { getDocument, getSettings, saveSettings, saveVocabEntry } from "../../lib/storage";
+import type { Document, FuriganaMode, Token } from "../../types";
 import "./ReaderScreen.css";
 
 // Reader module: the core document view — furigana-annotated text,
-// tap-word dictionary lookup, tap-sentence translation, and TTS playback.
-// Furigana rendering and word-tap (reading/POS/meaning) are implemented
-// below. TODO: tap-sentence translation (needs lib/translation), TTS
-// playback (needs lib/tts), and rendering a real multi-sentence Document
-// instead of one fixed sample string. See web/prototype/index.html for
-// the full intended design.
-
-const SAMPLE_TEXT = "吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。";
+// tap-word dictionary lookup (with save-to-vocabulary), and TTS playback.
+// TODO: tap-sentence translation (needs lib/translation), TTS playback
+// (needs lib/tts). See web/prototype/index.html for the full intended
+// design.
 
 // undefined = still loading, null = looked up but no entry found
 type Meaning = string[] | null | undefined;
@@ -22,23 +18,44 @@ interface PopoverState {
   top: number;
   left: number;
   meaning: Meaning;
+  saved: boolean;
 }
 
-export function ReaderScreen() {
-  const [tokens, setTokens] = useState<Token[] | null>(null);
+interface ReaderScreenProps {
+  documentId: string | null;
+}
+
+const FURIGANA_OPTIONS: { value: FuriganaMode; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "unknown", label: "Unknown" },
+  { value: "off", label: "Off" },
+];
+
+export function ReaderScreen({ documentId }: ReaderScreenProps) {
+  const [doc, setDoc] = useState<Document | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showFurigana, setShowFurigana] = useState(true);
+  const [furiganaMode, setFuriganaMode] = useState<FuriganaMode>("all");
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  const pageRef = useRef<HTMLDivElement>(null);
   const requestSeq = useRef(0);
 
   useEffect(() => {
+    getSettings().then((s) => setFuriganaMode(s.furigana));
+  }, []);
+
+  useEffect(() => {
+    setDoc(null);
+    setError(null);
+    if (!documentId) return;
     let cancelled = false;
-    tokenize(SAMPLE_TEXT)
-      .then((result) => { if (!cancelled) setTokens(result); })
+    getDocument(documentId)
+      .then((result) => {
+        if (cancelled) return;
+        if (!result) setError("Document not found.");
+        else setDoc(result);
+      })
       .catch((err) => { if (!cancelled) setError(String(err)); });
     return () => { cancelled = true; };
-  }, []);
+  }, [documentId]);
 
   useEffect(() => {
     if (!popover) return;
@@ -54,13 +71,19 @@ export function ReaderScreen() {
     };
   }, [popover]);
 
+  async function changeFuriganaMode(mode: FuriganaMode) {
+    setFuriganaMode(mode);
+    const settings = await getSettings();
+    await saveSettings({ ...settings, furigana: mode });
+  }
+
   function openPopover(e: React.SyntheticEvent<HTMLElement>, token: Token) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const left = Math.min(Math.max(8, rect.left), window.innerWidth - 256);
     let top = rect.bottom + 8;
-    if (top + 160 > window.innerHeight) top = rect.top - 168;
-    setPopover({ token, top, left, meaning: undefined });
+    if (top + 180 > window.innerHeight) top = rect.top - 188;
+    setPopover({ token, top, left, meaning: undefined, saved: false });
 
     const seq = ++requestSeq.current;
     lookup(token.lemma).then((entry) => {
@@ -69,67 +92,92 @@ export function ReaderScreen() {
     });
   }
 
+  async function saveWord(popoverState: PopoverState) {
+    const { token, meaning } = popoverState;
+    await saveVocabEntry({
+      id: crypto.randomUUID(),
+      surface: token.surface,
+      reading: token.reading,
+      meaning: Array.isArray(meaning) ? meaning.join("; ") : "",
+      stage: "new",
+      addedAt: Date.now(),
+      dueAt: Date.now(),
+    });
+    setPopover((current) => (current ? { ...current, saved: true } : current));
+  }
+
+  const showRt = (t: Token) =>
+    furiganaMode === "all" ? true : furiganaMode === "off" ? false : !t.isCommon;
+
   return (
     <section>
       <div className="reader-toolbar">
         <div className="reader-title">
-          吾輩は猫である
-          <small>I Am a Cat · Natsume Sōseki · opening lines</small>
+          {doc?.title ?? (documentId ? "" : "No document selected")}
+          {doc?.titleEn && <small>{doc.titleEn}</small>}
         </div>
-        <label className="furigana-switch">
-          <input
-            type="checkbox"
-            checked={showFurigana}
-            onChange={(e) => setShowFurigana(e.target.checked)}
-          />
-          Furigana
-        </label>
+        <div className="furigana-group">
+          <span>Furigana</span>
+          <div className="pill-group">
+            {FURIGANA_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                className={furiganaMode === opt.value ? "active" : ""}
+                onClick={() => changeFuriganaMode(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {error && <p style={{ color: "#a5473a" }}>{error}</p>}
-      {!tokens && !error && <p style={{ color: "var(--ink-faint)" }}>Tokenizing…</p>}
+      {!documentId && !error && (
+        <p style={{ color: "var(--ink-faint)" }}>Choose a document from the Library to start reading.</p>
+      )}
+      {documentId && !doc && !error && <p style={{ color: "var(--ink-faint)" }}>Loading…</p>}
 
-      {tokens && (
-        <div
-          ref={pageRef}
-          className={"reader-page" + (showFurigana ? "" : " no-furigana")}
-        >
-          {tokens.map((t, i) => {
-            const isSymbol = t.pos === "symbol";
-            const isParticle = t.pos === "particle";
-            const className =
-              "tok" + (isParticle ? " is-particle" : "") + (isSymbol ? " is-symbol" : "");
-            const content = t.isKanji ? (
-              <ruby>
-                {t.surface}
-                <rt>{t.reading}</rt>
-              </ruby>
-            ) : (
-              t.surface
-            );
+      {doc && (
+        <div className="reader-page">
+          {doc.sentences.map((sentence) =>
+            sentence.tokens.map((t, i) => {
+              const isSymbol = t.pos === "symbol";
+              const isParticle = t.pos === "particle";
+              const className =
+                "tok" + (isParticle ? " is-particle" : "") + (isSymbol ? " is-symbol" : "");
+              const content = t.isKanji && showRt(t) ? (
+                <ruby>
+                  {t.surface}
+                  <rt>{t.reading}</rt>
+                </ruby>
+              ) : (
+                t.surface
+              );
 
-            if (isSymbol) {
-              return <span key={i}>{content}</span>;
-            }
+              if (isSymbol) {
+                return <span key={sentence.id + i}>{content}</span>;
+              }
 
-            return (
-              <span
-                key={i}
-                className={className}
-                role="button"
-                tabIndex={0}
-                onClick={(e) => openPopover(e, t)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openPopover(e, t);
-                  }
-                }}
-              >
-                {content}
-              </span>
-            );
-          })}
+              return (
+                <span
+                  key={sentence.id + i}
+                  className={className}
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => openPopover(e, t)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openPopover(e, t);
+                    }
+                  }}
+                >
+                  {content}
+                </span>
+              );
+            })
+          )}
         </div>
       )}
 
@@ -149,6 +197,15 @@ export function ReaderScreen() {
                 <li key={i}>{m}</li>
               ))}
             </ul>
+          )}
+          {popover.meaning !== undefined && (
+            <button
+              className="wp-save"
+              disabled={popover.saved}
+              onClick={() => saveWord(popover)}
+            >
+              {popover.saved ? "Saved ✓" : "+ Save to vocabulary"}
+            </button>
           )}
         </div>
       )}
