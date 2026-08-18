@@ -1,0 +1,110 @@
+[
+  {
+    "surface": "吾輩",
+    "reading": "わがはい",
+    "pos": "pronoun",
+    "meanings": ["I, me — an old-fashioned, self-important way for a man to refer to himself"]
+  },
+  {
+    "surface": "は",
+    "reading": "は",
+    "pos": "particle",
+    "meanings": ["topic marker — marks what the sentence is about"]
+  },
+  {
+    "surface": "猫",
+    "reading": "ねこ",
+    "pos": "noun",
+    "meanings": ["cat"]
+  },
+  {
+    "surface": "だ",
+    "reading": "だ",
+    "pos": "auxiliary verb",
+    "meanings": ["the plain/informal form of です — to be, is"]
+  },
+  {
+    "surface": "ある",
+    "reading": "ある",
+    "pos": "auxiliary verb",
+    "meanings": ["to be, to exist (for inanimate things) — used here as a plain copula ending"]
+  },
+  {
+    "surface": "名前",
+    "reading": "なまえ",
+    "pos": "noun",
+    "meanings": ["name"]
+  },
+  {
+    "surface": "まだ",
+    "reading": "まだ",
+    "pos": "adverb",
+    "meanings": ["still, yet"]
+  },
+  {
+    "surface": "無い",
+    "reading": "ない",
+    "pos": "i-adjective",
+    "meanings": ["there isn't, doesn't exist — negative of ある"]
+  },
+  {
+    "surface": "どこ",
+    "reading": "どこ",
+    "pos": "pronoun",
+    "meanings": ["where"]
+  },
+  {
+    "surface": "で",
+    "reading": "で",
+    "pos": "particle",
+    "meanings": ["at, in — marks a location or means"]
+  },
+  {
+    "surface": "生れる",
+    "reading": "うまれる",
+    "pos": "verb",
+    "meanings": ["to be born"]
+  },
+  {
+    "surface": "た",
+    "reading": "た",
+    "pos": "auxiliary verb",
+    "meanings": ["marks the past tense"]
+  },
+  {
+    "surface": "か",
+    "reading": "か",
+    "pos": "particle",
+    "meanings": ["question marker"]
+  },
+  {
+    "surface": "とんと",
+    "reading": "とんと",
+    "pos": "adverb",
+    "meanings": ["(not) at all — emphasizes the negative that follows"]
+  },
+  {
+    "surface": "見当",
+    "reading": "けんとう",
+    "pos": "noun",
+    "meanings": ["a guess, an estimate; a general idea"]
+  },
+  {
+    "surface": "が",
+    "reading": "が",
+    "pos": "particle",
+    "meanings": ["subject marker"]
+  },
+  {
+    "surface": "つく",
+    "reading": "つく",
+    "pos": "verb",
+    "meanings": ["to be attached, to be settled/determined — negated here (つかぬ) as \"cannot be determined\""]
+  },
+  {
+    "surface": "ぬ",
+    "reading": "ぬ",
+    "pos": "auxiliary verb",
+    "meanings": ["(classical) negative ending, equivalent to modern ない"]
+  }
+]

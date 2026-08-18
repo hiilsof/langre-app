@@ -1,23 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { tokenize } from "../../lib/tokenizer";
+import { lookup } from "../../lib/dictionary";
 import type { Token } from "../../types";
 import "./ReaderScreen.css";
 
 // Reader module: the core document view — furigana-annotated text,
 // tap-word dictionary lookup, tap-sentence translation, and TTS playback.
-// Furigana rendering and word-tap (reading/POS only, from the tokenizer
-// itself) are implemented below. TODO: tap-sentence translation (needs
-// lib/translation), meanings in the word popover (needs lib/dictionary),
-// TTS playback (needs lib/tts), and rendering a real multi-sentence
-// Document instead of one fixed sample string. See web/prototype/index.html
-// for the full intended design.
+// Furigana rendering and word-tap (reading/POS/meaning) are implemented
+// below. TODO: tap-sentence translation (needs lib/translation), TTS
+// playback (needs lib/tts), and rendering a real multi-sentence Document
+// instead of one fixed sample string. See web/prototype/index.html for
+// the full intended design.
 
 const SAMPLE_TEXT = "吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。";
+
+// undefined = still loading, null = looked up but no entry found
+type Meaning = string[] | null | undefined;
 
 interface PopoverState {
   token: Token;
   top: number;
   left: number;
+  meaning: Meaning;
 }
 
 export function ReaderScreen() {
@@ -26,6 +30,7 @@ export function ReaderScreen() {
   const [showFurigana, setShowFurigana] = useState(true);
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
+  const requestSeq = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,10 +57,16 @@ export function ReaderScreen() {
   function openPopover(e: React.SyntheticEvent<HTMLElement>, token: Token) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const left = Math.min(Math.max(8, rect.left), window.innerWidth - 216);
+    const left = Math.min(Math.max(8, rect.left), window.innerWidth - 256);
     let top = rect.bottom + 8;
-    if (top + 100 > window.innerHeight) top = rect.top - 108;
-    setPopover({ token, top, left });
+    if (top + 160 > window.innerHeight) top = rect.top - 168;
+    setPopover({ token, top, left, meaning: undefined });
+
+    const seq = ++requestSeq.current;
+    lookup(token.lemma).then((entry) => {
+      if (requestSeq.current !== seq) return; // a different word was tapped meanwhile
+      setPopover((current) => (current && current.token === token ? { ...current, meaning: entry?.meanings ?? null } : current));
+    });
   }
 
   return (
@@ -130,6 +141,15 @@ export function ReaderScreen() {
         >
           <div className="wp-reading">{popover.token.reading}</div>
           <div className="wp-pos">{popover.token.pos}</div>
+          {popover.meaning === undefined && <div className="wp-meaning wp-meaning--loading">Looking up…</div>}
+          {popover.meaning === null && <div className="wp-meaning wp-meaning--empty">No dictionary entry yet</div>}
+          {Array.isArray(popover.meaning) && (
+            <ul className="wp-meaning">
+              {popover.meaning.map((m, i) => (
+                <li key={i}>{m}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
     </section>

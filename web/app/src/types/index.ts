@@ -2,6 +2,7 @@
 
 export interface Token {
   surface: string;
+  lemma: string; // dictionary/base form, e.g. "つく" for the inflected "つか" — this is the dictionary lookup key, not `surface`
   reading: string; // kana reading, e.g. "わがはい"
   pos: string; // part of speech, e.g. "noun", "particle"
   isKanji: boolean; // whether this token needs a furigana annotation

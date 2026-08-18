@@ -71,8 +71,12 @@ function toToken(feature: kuromoji.IpadicFeatures): Token {
   // isn't a real kana reading. TODO: fall back to lib/dictionary (JMdict)
   // once it's wired up, which covers many words IPADIC's reading field misses.
   const reading = feature.reading ? katakanaToHiragana(feature.reading) : surface;
+  // basic_form is "*" when it's the same as the surface form (e.g. nouns,
+  // particles) rather than repeating it.
+  const lemma = feature.basic_form && feature.basic_form !== "*" ? feature.basic_form : surface;
   return {
     surface,
+    lemma,
     reading,
     pos: describePos(feature.pos, feature.pos_detail_1),
     isKanji: KANJI.test(surface),

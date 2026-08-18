@@ -51,11 +51,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      // Precache the app shell plus the tokenizer dictionary; the
-      // translation model and JMdict index are large enough to fetch
-      // and cache on first use instead (see lib/translation, lib/dictionary).
+      // Precache the app shell, the tokenizer dictionary, and the small
+      // curated jmdict-mini.json; the full JMdict index and translation
+      // model (once wired up) are large enough to fetch and cache on
+      // first use instead (see lib/translation, lib/dictionary).
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,json}'],
         // kuromoji's .dat.gz dictionary files, cached separately since
         // they're binary and not part of the JS/CSS bundle.
         additionalManifestEntries: [],
