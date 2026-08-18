@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { getSettings, saveSettings } from "../../lib/storage";
+import { voicesReady } from "../../lib/tts";
 import type { FuriganaMode, Theme } from "../../types";
 
-// Settings module. Furigana mode and theme are real and persisted (and
-// shared with the Reader screen, which reads/writes the same stored
-// value). TTS voice/speed, translation mode, and offline-asset status
-// aren't here yet — those depend on lib/tts and lib/translation, which
-// are still stubs.
+// Settings module. Furigana mode, theme, and TTS voice/speed are real
+// and persisted. Translation display mode and offline-asset status
+// aren't here yet — those depend on lib/translation, which is still a
+// stub.
 
 interface SettingsScreenProps {
   theme: Theme;
@@ -27,15 +27,35 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 
 export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
   const [furiganaMode, setFuriganaMode] = useState<FuriganaMode | null>(null);
+  const [voiceURI, setVoiceURI] = useState<string | null>(null);
+  const [ttsSpeed, setTtsSpeed] = useState(1);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[] | null>(null);
 
   useEffect(() => {
-    getSettings().then((s) => setFuriganaMode(s.furigana));
+    getSettings().then((s) => {
+      setFuriganaMode(s.furigana);
+      setVoiceURI(s.voiceURI);
+      setTtsSpeed(s.ttsSpeed);
+    });
+    voicesReady().then((list) => setVoices(list.filter((v) => v.lang.startsWith("ja"))));
   }, []);
 
   async function changeFurigana(mode: FuriganaMode) {
     setFuriganaMode(mode);
     const settings = await getSettings();
     await saveSettings({ ...settings, furigana: mode });
+  }
+
+  async function changeVoice(uri: string) {
+    setVoiceURI(uri || null);
+    const settings = await getSettings();
+    await saveSettings({ ...settings, voiceURI: uri || null });
+  }
+
+  async function changeSpeed(speed: number) {
+    setTtsSpeed(speed);
+    const settings = await getSettings();
+    await saveSettings({ ...settings, ttsSpeed: speed });
   }
 
   return (
@@ -93,9 +113,63 @@ export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
         </div>
       </div>
 
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: "1.05rem", margin: 0 }}>Text-to-speech</h2>
+        <p style={{ color: "var(--ink-faint)", fontSize: "0.82rem", margin: "4px 0 16px" }}>
+          Uses your device's built-in speech voices — nothing is uploaded.
+        </p>
+
+        {voices === null && <p style={{ color: "var(--ink-faint)", fontSize: "0.85rem" }}>Checking available voices…</p>}
+        {voices?.length === 0 && (
+          <p style={{ color: "var(--ink-faint)", fontSize: "0.85rem" }}>
+            No Japanese voices found on this device. Check your OS's language/speech settings to
+            install one — Windows and macOS both ship one, but it may need enabling.
+          </p>
+        )}
+        {voices && voices.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: "0.9rem" }}>Voice</span>
+              <select
+                value={voiceURI ?? ""}
+                onChange={(e) => changeVoice(e.target.value)}
+                style={{
+                  font: "inherit",
+                  fontSize: "0.85rem",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--paper)",
+                  color: "var(--ink)",
+                  width: "fit-content",
+                }}
+              >
+                {voices.map((v) => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name} ({v.lang})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: "0.9rem" }}>Speed — {ttsSpeed.toFixed(2)}×</span>
+              <input
+                type="range"
+                min={0.5}
+                max={1.5}
+                step={0.25}
+                value={ttsSpeed}
+                onChange={(e) => changeSpeed(parseFloat(e.target.value))}
+                style={{ accentColor: "var(--accent)", width: 200 }}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+
       <p style={{ color: "var(--ink-faint)", fontSize: "0.8rem" }}>
-        Text-to-speech voice/speed, translation display mode, and offline dictionary/model status
-        will appear here once those modules are wired up.
+        Translation display mode and offline dictionary/model status will appear here once
+        lib/translation is wired up.
       </p>
     </section>
   );
