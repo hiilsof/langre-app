@@ -3,6 +3,7 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .reader-title {
@@ -17,8 +18,14 @@
   margin-top: 2px;
 }
 
-.furigana-group {
+.toolbar-controls {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.toolbar-group {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -89,6 +96,45 @@ rt {
 
 .sent.is-reading .tok {
   background: var(--amber-soft);
+}
+.sent {
+  display: inline;
+}
+
+.translate-btn {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 6px 0 4px;
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-faint);
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transform: translateY(-6px);
+}
+.translate-btn[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.translation {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin: 6px 0 20px;
 }
 
 .tts-bar {

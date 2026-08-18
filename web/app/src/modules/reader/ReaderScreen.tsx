@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { lookup } from "../../lib/dictionary";
-import { getDocument, getSettings, saveSettings, saveVocabEntry } from "../../lib/storage";
+import { getDocument, getSettings, saveDocument, saveSettings, saveVocabEntry } from "../../lib/storage";
 import { speak, stop as ttsStop } from "../../lib/tts";
-import type { Document, FuriganaMode, Token } from "../../types";
+import { translateSentence, type TranslationProgress } from "../../lib/translation";
+import type { Document, FuriganaMode, Sentence, Token, TranslationMode } from "../../types";
 import "./ReaderScreen.css";
 
 // Reader module: the core document view — furigana-annotated text,
-// tap-word dictionary lookup (with save-to-vocabulary), and TTS playback
-// (word-level, from the popover, and whole-document, from the bottom
-// bar — both via lib/tts). TODO: tap-sentence translation (needs
-// lib/translation). See web/prototype/index.html for the full intended
-// design.
+// tap-word dictionary lookup (with save-to-vocabulary), TTS playback
+// (word-level and whole-document, via lib/tts), and sentence translation
+// (tap-to-reveal or always-shown, via lib/translation — results are
+// written back onto Sentence.translation and persisted so a document
+// isn't re-translated every time it's reopened). See
+// web/prototype/index.html for the full intended design.
 
 // undefined = still loading, null = looked up but no entry found
 type Meaning = string[] | null | undefined;
@@ -34,23 +36,37 @@ const FURIGANA_OPTIONS: { value: FuriganaMode; label: string }[] = [
   { value: "off", label: "Off" },
 ];
 
+const TRANSLATION_OPTIONS: { value: TranslationMode; label: string }[] = [
+  { value: "tap", label: "Tap" },
+  { value: "always", label: "Always" },
+];
+
 export function ReaderScreen({ documentId }: ReaderScreenProps) {
   const [doc, setDoc] = useState<Document | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [furiganaMode, setFuriganaMode] = useState<FuriganaMode>("all");
+  const [translationMode, setTranslationMode] = useState<TranslationMode>("tap");
+  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [translating, setTranslating] = useState<Record<string, TranslationProgress>>({});
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playingSentenceId, setPlayingSentenceId] = useState<string | null>(null);
   const requestSeq = useRef(0);
   const playSession = useRef(0);
+  const docRef = useRef<Document | null>(null);
 
   useEffect(() => {
-    getSettings().then((s) => setFuriganaMode(s.furigana));
+    getSettings().then((s) => {
+      setFuriganaMode(s.furigana);
+      setTranslationMode(s.translation);
+    });
   }, []);
 
   useEffect(() => {
     setDoc(null);
     setError(null);
+    setRevealed({});
+    setTranslating({});
     if (!documentId) return;
     let cancelled = false;
     getDocument(documentId)
@@ -62,6 +78,27 @@ export function ReaderScreen({ documentId }: ReaderScreenProps) {
       .catch((err) => { if (!cancelled) setError(String(err)); });
     return () => { cancelled = true; };
   }, [documentId]);
+
+  useEffect(() => {
+    docRef.current = doc;
+  }, [doc]);
+
+  // "Always show" mode translates every untranslated sentence up front,
+  // one at a time (the first call downloads the model; the rest reuse
+  // it, so this doesn't parallelize many downloads).
+  useEffect(() => {
+    if (translationMode !== "always" || !doc) return;
+    let cancelled = false;
+    (async () => {
+      for (const sentence of doc.sentences) {
+        if (cancelled) return;
+        const current = docRef.current?.sentences.find((s) => s.id === sentence.id);
+        if (current && !current.translation) await translateSentenceNow(current);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [translationMode, doc?.id]);
 
   // Stop any in-progress playback when switching documents or leaving
   // the screen, so speech doesn't keep going after the text it's reading
@@ -91,6 +128,48 @@ export function ReaderScreen({ documentId }: ReaderScreenProps) {
     setFuriganaMode(mode);
     const settings = await getSettings();
     await saveSettings({ ...settings, furigana: mode });
+  }
+
+  async function changeTranslationMode(mode: TranslationMode) {
+    setTranslationMode(mode);
+    const settings = await getSettings();
+    await saveSettings({ ...settings, translation: mode });
+  }
+
+  function toggleReveal(sentence: Sentence) {
+    const willReveal = !revealed[sentence.id];
+    setRevealed((r) => ({ ...r, [sentence.id]: willReveal }));
+    if (willReveal && !sentence.translation) translateSentenceNow(sentence);
+  }
+
+  async function translateSentenceNow(sentence: Sentence) {
+    if (sentence.translation || translating[sentence.id]) return;
+    setTranslating((t) => ({ ...t, [sentence.id]: { status: "downloading", progress: 0 } }));
+    let translated: string;
+    try {
+      const text = sentence.tokens.map((t) => t.surface).join("");
+      translated = await translateSentence(text, (p) => {
+        setTranslating((t) => ({ ...t, [sentence.id]: p }));
+      });
+    } catch {
+      setTranslating((t) => ({ ...t, [sentence.id]: { status: "error" } }));
+      return;
+    }
+    const current = docRef.current;
+    if (current) {
+      const updated: Document = {
+        ...current,
+        sentences: current.sentences.map((s) => (s.id === sentence.id ? { ...s, translation: translated } : s)),
+      };
+      docRef.current = updated;
+      setDoc(updated);
+      await saveDocument(updated);
+    }
+    setTranslating((t) => {
+      const next = { ...t };
+      delete next[sentence.id];
+      return next;
+    });
   }
 
   function openPopover(e: React.SyntheticEvent<HTMLElement>, token: Token) {
@@ -172,18 +251,34 @@ export function ReaderScreen({ documentId }: ReaderScreenProps) {
           {doc?.title ?? (documentId ? "" : "No document selected")}
           {doc?.titleEn && <small>{doc.titleEn}</small>}
         </div>
-        <div className="furigana-group">
-          <span>Furigana</span>
-          <div className="pill-group">
-            {FURIGANA_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                className={furiganaMode === opt.value ? "active" : ""}
-                onClick={() => changeFuriganaMode(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
+        <div className="toolbar-controls">
+          <div className="toolbar-group">
+            <span>Furigana</span>
+            <div className="pill-group">
+              {FURIGANA_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={furiganaMode === opt.value ? "active" : ""}
+                  onClick={() => changeFuriganaMode(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="toolbar-group">
+            <span>Translation</span>
+            <div className="pill-group">
+              {TRANSLATION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  className={translationMode === opt.value ? "active" : ""}
+                  onClick={() => changeTranslationMode(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -237,6 +332,31 @@ export function ReaderScreen({ documentId }: ReaderScreenProps) {
                   </span>
                 );
               })}
+              {translationMode === "tap" && (
+                <button
+                  className="translate-btn"
+                  aria-pressed={!!revealed[sentence.id]}
+                  onClick={() => toggleReveal(sentence)}
+                >
+                  EN
+                </button>
+              )}
+              {(translationMode === "always" || revealed[sentence.id]) && (
+                <span
+                  className="translation"
+                  onClick={() => {
+                    if (translating[sentence.id]?.status === "error") translateSentenceNow(sentence);
+                  }}
+                >
+                  {sentence.translation
+                    ? sentence.translation
+                    : translating[sentence.id]?.status === "downloading"
+                      ? `Downloading translation model… ${Math.round((translating[sentence.id]?.progress ?? 0) * 100)}%`
+                      : translating[sentence.id]?.status === "error"
+                        ? "Translation failed — tap to retry."
+                        : "Translating…"}
+                </span>
+              )}
             </span>
           ))}
         </div>

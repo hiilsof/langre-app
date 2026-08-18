@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { getSettings, saveSettings } from "../../lib/storage";
 import { voicesReady } from "../../lib/tts";
-import type { FuriganaMode, Theme } from "../../types";
+import type { FuriganaMode, Theme, TranslationMode } from "../../types";
 
-// Settings module. Furigana mode, theme, and TTS voice/speed are real
-// and persisted. Translation display mode and offline-asset status
-// aren't here yet — those depend on lib/translation, which is still a
-// stub.
+// Settings module. Furigana mode, translation mode, theme, and TTS
+// voice/speed are all real and persisted. Offline dictionary/model
+// status isn't here yet.
 
 interface SettingsScreenProps {
   theme: Theme;
@@ -19,6 +18,11 @@ const FURIGANA_OPTIONS: { value: FuriganaMode; label: string; hint: string }[] =
   { value: "off", label: "Off", hint: "No readings shown" },
 ];
 
+const TRANSLATION_OPTIONS: { value: TranslationMode; label: string; hint: string }[] = [
+  { value: "tap", label: "Tap to reveal", hint: "Sentences stay hidden until you tap \"EN\"" },
+  { value: "always", label: "Always show", hint: "Every sentence is translated as soon as you open the document" },
+];
+
 const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: "system", label: "System" },
   { value: "light", label: "Light" },
@@ -27,6 +31,7 @@ const THEME_OPTIONS: { value: Theme; label: string }[] = [
 
 export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
   const [furiganaMode, setFuriganaMode] = useState<FuriganaMode | null>(null);
+  const [translationMode, setTranslationMode] = useState<TranslationMode | null>(null);
   const [voiceURI, setVoiceURI] = useState<string | null>(null);
   const [ttsSpeed, setTtsSpeed] = useState(1);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[] | null>(null);
@@ -34,6 +39,7 @@ export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
   useEffect(() => {
     getSettings().then((s) => {
       setFuriganaMode(s.furigana);
+      setTranslationMode(s.translation);
       setVoiceURI(s.voiceURI);
       setTtsSpeed(s.ttsSpeed);
     });
@@ -44,6 +50,12 @@ export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
     setFuriganaMode(mode);
     const settings = await getSettings();
     await saveSettings({ ...settings, furigana: mode });
+  }
+
+  async function changeTranslation(mode: TranslationMode) {
+    setTranslationMode(mode);
+    const settings = await getSettings();
+    await saveSettings({ ...settings, translation: mode });
   }
 
   async function changeVoice(uri: string) {
@@ -75,6 +87,32 @@ export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
                 name="furigana"
                 checked={furiganaMode === opt.value}
                 onChange={() => changeFurigana(opt.value)}
+                style={{ marginTop: 3, accentColor: "var(--accent)" }}
+              />
+              <span>
+                <div style={{ fontSize: "0.9rem" }}>{opt.label}</div>
+                <div style={{ fontSize: "0.78rem", color: "var(--ink-faint)" }}>{opt.hint}</div>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <h2 style={{ fontSize: "1.05rem", margin: 0 }}>Translation</h2>
+        <p style={{ color: "var(--ink-faint)", fontSize: "0.82rem", margin: "4px 0 16px" }}>
+          Runs a small model on-device the first time you translate a sentence — the first
+          translation in a session downloads it (~80MB), the rest are instant. Quality is well
+          below a cloud translator; that's the trade-off for working fully offline and free.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {TRANSLATION_OPTIONS.map((opt) => (
+            <label key={opt.value} style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+              <input
+                type="radio"
+                name="translation"
+                checked={translationMode === opt.value}
+                onChange={() => changeTranslation(opt.value)}
                 style={{ marginTop: 3, accentColor: "var(--accent)" }}
               />
               <span>
@@ -168,8 +206,8 @@ export function SettingsScreen({ theme, onThemeChange }: SettingsScreenProps) {
       </div>
 
       <p style={{ color: "var(--ink-faint)", fontSize: "0.8rem" }}>
-        Translation display mode and offline dictionary/model status will appear here once
-        lib/translation is wired up.
+        Offline dictionary/model download status will appear here once that's worth surfacing —
+        right now everything downloads silently on first use.
       </p>
     </section>
   );

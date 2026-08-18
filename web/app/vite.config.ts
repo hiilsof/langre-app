@@ -53,13 +53,29 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // Precache the app shell, the tokenizer dictionary, and the small
       // curated jmdict-mini.json; the full JMdict index and translation
-      // model (once wired up) are large enough to fetch and cache on
-      // first use instead (see lib/translation, lib/dictionary).
+      // model weights are large enough to fetch and cache on first use
+      // instead (see lib/translation, lib/dictionary — the model weights
+      // specifically are cached by transformers.js itself, not workbox,
+      // since they're fetched from huggingface.co rather than our origin).
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,json}'],
         // kuromoji's .dat.gz dictionary files, cached separately since
         // they're binary and not part of the JS/CSS bundle.
         additionalManifestEntries: [],
+        // The ONNX runtime's WASM binary (~23MB, part of our own build
+        // output) is too big to eagerly precache on install, but still
+        // needs to survive being offline on a *second* visit — cache it
+        // the first time it's actually requested instead.
+        runtimeCaching: [
+          {
+            urlPattern: /\.wasm$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'onnx-wasm-runtime',
+              expiration: { maxEntries: 4 },
+            },
+          },
+        ],
       },
       includeAssets: ['dict/*.gz'],
       manifest: {
